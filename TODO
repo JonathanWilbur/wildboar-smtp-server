@@ -1,0 +1,9 @@
+- [ ] Custom commands
+  - [ ] X-SHUTDOWN = Shuts down the server
+  - [ ] X-DISRUPT = Disconnects everybody
+  - [ ] X-PAUSE = Stops the server from responding to commands for a while
+  - [ ] X-BLOCK = Blocks a specified host or IP
+  - [ ] X-DIAGNOSE = Displays diagnostic information
+  - [ ] X-DIAGMAIL = Mails diagnostic information
+  - [ ] X-FIREHOSE = Sends emails in rapid succession
+  - [ ] X-LOCKDOWN = Only allow send and receive from the local domain
