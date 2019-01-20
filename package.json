@@ -1,5 +1,5 @@
 {
-  "name": "smtp-server",
+  "name": "scalemail-smtp-server",
   "version": "0.1.0",
   "description": "",
   "main": "./dist/index.js",
