@@ -1,5 +1,5 @@
 {
-  "name": "scalemail-smtp-server",
+  "name": "wildboar-smtp-server",
   "version": "0.1.0",
   "description": "",
   "main": "./dist/index.js",
