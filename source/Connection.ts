@@ -1,12 +1,13 @@
 import * as net from "net";
+import Lexeme from "./Lexeme";
+import LexemeType from "./LexemeType";
+import Scanner from "./Scanner";
 import Transaction from "./Transaction";
 
 export default
 class Connection {
 
-    private readCursor : number = 0;
-    private receivedData : Buffer = new Buffer(0);
-
+    private scanner = new Scanner(this.socket);
     // RFC 5321 Section 4.1.4:
     // A session that will contain mail transactions MUST first be
     // initialized by the use of the EHLO command.  An SMTP server SHOULD
@@ -14,64 +15,39 @@ class Connection {
     // without this initialization.
     private clientSaidHello : boolean = false;
     private clientEstimatedMessageSize : number = 0;
+    private expectedLexemeType : LexemeType = LexemeType.COMMANDLINE;
     private transaction : Transaction = {
         from: "",
         to: [],
-        data: new Buffer(0)
+        data: Buffer.alloc(0)
     };
-
-    private static readonly commandTerminators : { [ name : string ] : Buffer } = {
-        "HELO": Buffer.from("\r\n"),
-        "EHLO": Buffer.from("\r\n"),
-        "MAIL": Buffer.from("\r\n"),
-        "RCPT": Buffer.from("\r\n"),
-        "DATA": Buffer.from("\r\n.\r\n"),
-        "RSET": Buffer.from("\r\n"),
-        "VRFY": Buffer.from("\r\n"),
-        "EXPN": Buffer.from("\r\n"),
-        "HELP": Buffer.from("\r\n"),
-        "NOOP": Buffer.from("\r\n"),
-        "QUIT": Buffer.from("\r\n")
-    }
 
     constructor (readonly socket : net.Socket) {
 
         // TODO: Return 554 if connection rejected.
         this.respond(220, "testeroni Service ready");
-
-        // Rules: only increment readCursor after a command has been fully processed.
         socket.on("data", (data : Buffer) : void => {
-
-            // TODO: Periodically clear the buffer, somehow.
-            // Append new data to the buffer.
-            this.receivedData = Buffer.concat([ this.receivedData, data ]);
-
-            let parsedCommand : string | undefined = undefined;
-
-            for (let i : number = this.readCursor; i < this.receivedData.length; i++) {
-                if (
-                    this.receivedData[i] === " ".charCodeAt(0) &&
-                    i !== this.readCursor
-                ) {
-                    // REVIEW: Can this throw?
-                    parsedCommand = this.receivedData.slice(this.readCursor, i).toString("ascii");
-                    break;
+            this.scanner.enqueueData(data);
+            let lexeme : Lexeme | null = null;
+            while (true) {
+                switch (this.expectedLexemeType) {
+                    case (LexemeType.COMMANDLINE):  lexeme = this.scanner.scanLine();  break;
+                    case (LexemeType.DATA):         lexeme = this.scanner.scanData();  break;
+                    case (LexemeType.CHUNK):        lexeme = this.scanner.scanChunk(); break;
+                    // TODO: Default
                 }
-            }
-
-            if (typeof parsedCommand === "undefined") {
-                console.log("Parsed command was undefined.");
-                return;
-            }
-            // TODO: Validate command here.
-            parsedCommand = parsedCommand.toUpperCase(); // TODO: Quote spec about case insensitivity.
-            const indexOfEndOfCommand : number = this.findEndOfCommand(parsedCommand);
-            if (indexOfEndOfCommand === -1) return;
-            const args : Buffer =  this.receivedData.slice((this.readCursor + parsedCommand.length + " ".length), indexOfEndOfCommand);
-            this.dispatchCommand(parsedCommand, args);
-            this.readCursor = indexOfEndOfCommand;
-            if (parsedCommand in Connection.commandTerminators)
-                this.readCursor += Connection.commandTerminators[parsedCommand].length;
+                if (!lexeme) break;
+                if (lexeme.type === LexemeType.COMMANDLINE) {
+                    const command : string = lexeme.getCommand();
+                    const args : string = lexeme.getArguments();
+                    this.dispatchCommand(command, args);
+                } else if (lexeme.type === LexemeType.DATA) {
+                    this.expectedLexemeType = LexemeType.COMMANDLINE;
+                    this.transaction.data = lexeme.token;
+                    this.respond(250, "DATA OK");
+                    console.log(this.transaction);
+                }
+            };
         });
 
         socket.on("close", (had_error : boolean) : void => {
@@ -79,50 +55,39 @@ class Connection {
         });
     }
 
-    private resetTransaction () : void {
-        this.transaction = {
-            from: "",
-            to: [],
-            data: new Buffer(0)
-        }
-    }
-
     private respond (code : number, message : string) : void {
         this.socket.write(`${code} ${message}\r\n`);
     }
 
-    // This method exists because not all commands are terminated by CRLF.
-    // Returns -1 if end not found.
-    private findEndOfCommand (command : string) : number {
-        switch (command) {
-            case ("HELO"):
-            case ("EHLO"):
-            case ("MAIL"):
-            case ("RCPT"):
-            case ("RSET"):
-            case ("VRFY"):
-            case ("EXPN"):
-            case ("HELP"):
-            case ("NOOP"):
-            case ("QUIT"):
-                return this.receivedData.indexOf("\r\n", (this.readCursor + command.length));
-            case ("DATA"):
-                return this.receivedData.indexOf("\r\n.\r\n", (this.readCursor + command.length));
-            default: {
-                this.respond(500, `Command '${command}' not recognized.`);
-                return -1;
-            }
+    private respondMultiline (code : number, lines : string[]) : void {
+        if (lines.length === 0) return;
+        this.socket.write(`${lines.map((line : string)=> `${code}-${line}`).join("\r\n")}`);
+    }
+
+    private resetTransaction () : void {
+        this.transaction = {
+            from: "",
+            to: [],
+            data: Buffer.alloc(0)
         }
     }
 
     // "It is important that you do not use a callback map, because the map
     // itself will become 'this' in the callbacks." -- Hard experience.
-    private dispatchCommand (command : string, args : Buffer) : void {
+    private dispatchCommand (command : string, args : string) : void {
+        console.log(`Dispatching '${command}'.`);
         switch (command) {
             case ("HELO"): this.executeHELO(args); break;
             case ("EHLO"): this.executeEHLO(args); break;
             case ("MAIL"): this.executeMAIL(args); break;
             case ("RCPT"): this.executeRCPT(args); break;
+            case ("DATA"): this.executeDATA(args); break;
+            case ("RSET"): this.executeRSET(args); break;
+            case ("VRFY"): this.executeVRFY(args); break;
+            case ("EXPN"): this.executeEXPN(args); break;
+            case ("HELP"): this.executeHELP(args); break;
+            case ("NOOP"): this.executeNOOP(args); break;
+            case ("QUIT"): this.executeQUIT(args); break;
             default: {
                 this.respond(504, `Command '${command}' not implemented.`);
             }
@@ -132,12 +97,7 @@ class Connection {
     // Individual command handlers go below here.
 
     // TODO: Return 504, 550
-    private executeHELO (args : Buffer) : void {
-        const lineLength : number = ("HELO ".length + args.length + "\r\n".length);
-        if (lineLength > 512) {
-            this.respond(500, `Command line too long. Must not exceed 512 characters. Yours was ${lineLength} characters long.`);
-            return;
-        }
+    private executeHELO (args : string) : void {
 
         // RFC 5321 Section 4.1.4:
         // A session that will contain mail transactions MUST first be
@@ -157,12 +117,7 @@ class Connection {
     }
 
     // TODO: Return 504, 550
-    private executeEHLO (args : Buffer) : void {
-        const lineLength : number = ("EHLO ".length + args.length + "\r\n".length);
-        if (lineLength > 512) {
-            this.respond(500, `Command line too long. Must not exceed 512 characters. Yours was ${lineLength} characters long.`);
-            return;
-        }
+    private executeEHLO (args : string) : void {
 
         // RFC 5321 Section 4.1.4:
         // A session that will contain mail transactions MUST first be
@@ -182,12 +137,7 @@ class Connection {
     }
 
     // TODO: Return 552, 451, 452, 550, 553, 503, 455, 555
-    private executeMAIL (args : Buffer) : void {
-        const lineLength : number = ("MAIL ".length + args.length + "\r\n".length);
-        if (lineLength > 512) {
-            this.respond(500, `Command line too long. Must not exceed 512 characters. Yours was ${lineLength} characters long.`);
-            return;
-        }
+    private executeMAIL (args : string) : void {
 
         // RFC 5321 Section 4.1.4:
         // A session that will contain mail transactions MUST first be
@@ -199,8 +149,13 @@ class Connection {
             return;
         }
 
-        const indexOfStartOfEmail : number = args.toString().indexOf("FROM:<");
-        const indexOfClosingBracket : number = args.toString().indexOf(">");
+        if (args === "") {
+            this.respond(501, "The MAIL command requires arguments, which you did not supply.");
+            return;
+        }
+
+        const indexOfStartOfEmail : number = args.indexOf("FROM:<");
+        const indexOfClosingBracket : number = args.indexOf(">");
         if (
             indexOfStartOfEmail   !== -1 &&
             indexOfClosingBracket !== -1
@@ -211,8 +166,8 @@ class Connection {
             // from its argument clause into the reverse-path buffer.
             this.transaction.from = "";
             this.transaction.to = [];
-            this.transaction.data = new Buffer(0);
-            this.transaction.from = args.toString().slice("FROM:<".length, indexOfClosingBracket);
+            this.transaction.data = Buffer.alloc(0);
+            this.transaction.from = args.slice("FROM:<".length, indexOfClosingBracket);
             // TODO: Validate FROM
             // TODO: Support the SIZE parameter.
             this.respond(250, "MAIL OK");
@@ -221,12 +176,7 @@ class Connection {
         }
     }
 
-    private executeRCPT (args : Buffer) : void {
-        const lineLength : number = ("RCPT ".length + args.length + "\r\n".length);
-        if (lineLength > 512) {
-            this.respond(500, `Command line too long. Must not exceed 512 characters. Yours was ${lineLength} characters long.`);
-            return;
-        }
+    private executeRCPT (args : string) : void {
 
         // RFC 5321 Section 4.1.4:
         // A session that will contain mail transactions MUST first be
@@ -238,8 +188,13 @@ class Connection {
             return;
         }
 
-        const indexOfStartOfEmail : number = args.toString().indexOf("TO:<");
-        const indexOfClosingBracket : number = args.toString().indexOf(">");
+        if (args === "") {
+            this.respond(501, "The RCPT command requires arguments, which you did not supply.");
+            return;
+        }
+
+        const indexOfStartOfEmail : number = args.indexOf("TO:<");
+        const indexOfClosingBracket : number = args.indexOf(">");
         if (
             indexOfStartOfEmail   !== -1 &&
             indexOfClosingBracket !== -1
@@ -248,8 +203,7 @@ class Connection {
             // This command appends its forward-path argument to the forward-path
             // buffer; it does not change the reverse-path buffer nor the mail data
             // buffer.
-            // this.transaction.from = args.toString().slice("TO:<".length, indexOfClosingBracket);
-            const matches : RegExpExecArray | null = /^<(?<sourceRoutes>[^:]+:)(?<destination>[^>]+)>/g.exec(args.toString());
+            const matches : RegExpExecArray | null = /^TO:<(?:(?<sourceRoutes>[^:]+):)?(?<destination>[^>]+)>/.exec(args);
             if (!matches) {
                 this.respond(500, "Malformed RCPT command.");
                 return;
@@ -259,12 +213,63 @@ class Connection {
                 return;
             }
             this.transaction.to.push({
-                sourceRoutes: matches.groups.sourceRoutes.split(","),
+                sourceRoutes: (matches.groups.sourceRoutes !== undefined ? matches.groups.sourceRoutes.split(",") : []),
                 destinationMailbox: matches.groups.destination
             });
             this.respond(250, "RCPT OK");
         } else {
             this.respond(500, "Malformed RCPT Command.");
         }
+    }
+
+    private executeDATA (args : string) : void {
+        this.expectedLexemeType = LexemeType.DATA;
+        this.respond(354, "Go ahead.");
+    }
+
+    private executeRSET (args : string) : void {
+        if (args.length === 0) {
+            this.resetTransaction();
+            this.respond(250, "RSET OK");
+        } else {
+            this.respond(501, "RSET does not accept any parameters.");
+        }
+    }
+
+    // TODO: This warrants a verification queue in RabbitMQ
+    private executeVRFY (args : string) : void {
+        // getMatchingUsers(args)
+        // if multiple, respond 553 and a list of users or "User ambiguous"
+        // Respond 550 if it is a mailing list, not a user.
+        // Respond 252 if unable to verify members of mailing list.
+        this.respond(250, "VRFY OK");
+        // This is only here for test purposes, obviously.
+        this.respondMultiline(250, [
+            "User ambiguous; possible matches: ",
+            "Jonathan M. Wilbur <jonathan@wilbur.space>",
+            "Sam Hyde <sam@mde.com>"
+        ]);
+    }
+
+    private executeEXPN (args : string) : void {
+        // Respond 550 if it is a username, not a mailing list.
+        // Respond 252 if mailing list does not exist.
+        this.respond(250, "EXPN OK");
+        // This is only here for test purposes, obviously.
+        this.respondMultiline(250, [ "Jonathan M. Wilbur <jonathan@wilbur.space>", "Sam Hyde <sam@mde.com>" ]);
+    }
+
+    // TODO: Implement a custom help message. Separate ones for authenticated and non-authenticated.
+    private executeHELP (args : string) : void {
+        this.respond(502, "Go help yourself.");
+    }
+
+    private executeNOOP (args : string) : void {
+        this.respond(250, "NOOP OK");
+    }
+
+    private executeQUIT (args : string) : void {
+        this.respond(250, "Bye.");
+        this.socket.end();
     }
 }

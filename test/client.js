@@ -9,10 +9,17 @@ s.on("receive", (chunk) => {
     console.log(chunk);
 });
 
-s.connect();
-s.greet({ hostname: "spaghetti" });
-// s.authPlain({ username: "bob", password: "mccobb" });
-s.mail({ from: "bob@mccobb.com" });
-s.rcpt({ to: "joe@schmoe.com" });
-// s.data("mail source?");
-s.quit();
+(async function() {
+    await s.connect();
+    await s.rset();
+    // await s.vrfy(); // Not implemented in this client.
+    // await s.expn(); // Not implemented in this client.
+    await s.noop();
+    // await s.help(); // Not implemented in this client.
+    await s.greet({hostname: 'spaghetti'});
+    // await s.authPlain({username: 'john', password: 'secret'}); // authenticates a user
+    await s.mail({from: 'from@sender.com'});
+    await s.rcpt({to: 'to@recipient.com'});
+    await s.data('TESTERONI'); // runs DATA command and streams email source
+    await s.quit(); // runs QUIT command
+})().catch(console.error);

@@ -1,13 +1,13 @@
 {
-  "name": "smtp-ts",
-  "version": "1.0.0",
+  "name": "smtp-server",
+  "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^10.12.18",
     "smtp-client": "^0.3.1"
