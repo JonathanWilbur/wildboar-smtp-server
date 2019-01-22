@@ -3,6 +3,7 @@ import Lexeme from "./Lexeme";
 import LexemeType from "./LexemeType";
 import Scanner from "./Scanner";
 import Transaction from "./Transaction";
+import Server from "./Server";
 
 export default
 class Connection {
@@ -22,10 +23,13 @@ class Connection {
         data: Buffer.alloc(0)
     };
 
-    constructor (readonly socket : net.Socket) {
+    constructor (
+        readonly server : Server,
+        readonly socket : net.Socket
+    ) {
 
         // TODO: Return 554 if connection rejected.
-        this.respond(220, "testeroni Service ready");
+        this.respond(220, this.server.configuration.smtp_server_greeting);
         socket.on("data", (data : Buffer) : void => {
             this.scanner.enqueueData(data);
             let lexeme : Lexeme | null = null;
@@ -51,7 +55,7 @@ class Connection {
         });
 
         socket.on("close", (had_error : boolean) : void => {
-            console.log(`Connection closed. Had error? ${had_error}.`);
+            console.log(`Bye!`);
         });
     }
 
@@ -112,8 +116,7 @@ class Connection {
         // and reset the state exactly as if a RSET command had been issued.
         this.resetTransaction();
 
-        // TODO: Replace with a real server name.
-        this.respond(250, `testeroni`);
+        this.respond(250, this.server.configuration.smtp_server_domain);
     }
 
     // TODO: Return 504, 550
@@ -132,8 +135,7 @@ class Connection {
         // and reset the state exactly as if a RSET command had been issued.
         this.resetTransaction();
 
-        // TODO: Replace with a real server name.
-        this.respond(250, `testeroni`);
+        this.respond(250, this.server.configuration.smtp_server_domain);
     }
 
     // TODO: Return 552, 451, 452, 550, 553, 503, 455, 555

@@ -2,7 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const Scanner_1 = require("./Scanner");
 class Connection {
-    constructor(socket) {
+    constructor(server, socket) {
+        this.server = server;
         this.socket = socket;
         this.scanner = new Scanner_1.default(this.socket);
         this.clientSaidHello = false;
@@ -13,7 +14,7 @@ class Connection {
             to: [],
             data: Buffer.alloc(0)
         };
-        this.respond(220, "testeroni Service ready");
+        this.respond(220, this.server.configuration.smtp_server_greeting);
         socket.on("data", (data) => {
             this.scanner.enqueueData(data);
             let lexeme = null;
@@ -46,7 +47,7 @@ class Connection {
             ;
         });
         socket.on("close", (had_error) => {
-            console.log(`Connection closed. Had error? ${had_error}.`);
+            console.log(`Bye!`);
         });
     }
     respond(code, message) {
@@ -108,12 +109,12 @@ class Connection {
     executeHELO(args) {
         this.clientSaidHello = true;
         this.resetTransaction();
-        this.respond(250, `testeroni`);
+        this.respond(250, this.server.configuration.smtp_server_domain);
     }
     executeEHLO(args) {
         this.clientSaidHello = true;
         this.resetTransaction();
-        this.respond(250, `testeroni`);
+        this.respond(250, this.server.configuration.smtp_server_domain);
     }
     executeMAIL(args) {
         if (!this.clientSaidHello) {
