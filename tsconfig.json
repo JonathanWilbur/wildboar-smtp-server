@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "allowJs": false,
+        "allowJs": true,
         "allowUnreachableCode": false,
         // "allowUnusedLabels": false,
         "alwaysStrict": true,
@@ -27,6 +27,7 @@
         "target": "ESNext"
     },
     "include": [
-        "./source/**/*.ts"
+        "./source/**/*.ts",
+        "./source/**/*.js"
     ]
 }

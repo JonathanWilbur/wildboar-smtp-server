@@ -75,7 +75,7 @@ class EnvironmentVariableConfigurationSource {
         return env;
     }
     get smtp_server_ip_bind_address() {
-        const DEFAULT_VALUE = "0.0.0.0";
+        const DEFAULT_VALUE = "127.0.0.1";
         const env = this.getString("smtp.server.ip.bind_address");
         if (!env)
             return DEFAULT_VALUE;
@@ -112,6 +112,34 @@ class EnvironmentVariableConfigurationSource {
     get smtp_server_greeting() {
         const DEFAULT_VALUE = "Hey there, hoss.";
         const env = this.getString("smtp.server.greeting");
+        if (!env)
+            return DEFAULT_VALUE;
+        return env;
+    }
+    get queue_server_hostname() {
+        const DEFAULT_VALUE = "localhost";
+        const env = this.getString("queue.server.hostname");
+        if (!env)
+            return DEFAULT_VALUE;
+        return env;
+    }
+    get queue_server_tcp_listening_port() {
+        const DEFAULT_VALUE = 5672;
+        const env = this.getInteger("queue.server.tcp.listening_port");
+        if (!env)
+            return DEFAULT_VALUE;
+        return env;
+    }
+    get queue_username() {
+        const DEFAULT_VALUE = "";
+        const env = this.getString("queue.hostname");
+        if (!env)
+            return DEFAULT_VALUE;
+        return env;
+    }
+    get queue_password() {
+        const DEFAULT_VALUE = "";
+        const env = this.getString("queue.hostname");
         if (!env)
             return DEFAULT_VALUE;
         return env;

@@ -1,9 +1,30 @@
 version: '3.7'
 
+networks:
+  messaging:
+    external: false
+
 services:
 
   smtp:
     build: .
     container_name: 'smtphost'
+    depends_on:
+      - messagebroker
+    hostname: 'smtphost'
+    networks:
+      - messaging
     ports:
       - '25:25'
+
+  messagebroker:
+    container_name: 'qhost'
+    hostname: 'qhost'
+    image: 'rabbitmq:management-alpine'
+    networks:
+      - messaging
+    ports:
+      - '5672:5672/tcp'
+      - '15672:15672/tcp'
+    volumes:
+      - "${PWD}/configuration/rabbitmq/enabled_plugins.erl:/etc/rabbitmq/enabled_plugins:ro"

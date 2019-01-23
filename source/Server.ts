@@ -1,13 +1,19 @@
 import * as net from "net";
+import AMQPMessageBroker from "./MessageBrokers/AMQP";
+import ConfigurationSource from "./ConfigurationSource";
 import Connection from "./Connection";
+import MessageBroker from "./MessageBroker";
 import TypedKeyValueStore from "./ConfigurationSource";
 
 export default
 class Server {
 
+    private messageBroker! : MessageBroker;
+
     constructor(
-        readonly configuration : TypedKeyValueStore
+        readonly configuration : TypedKeyValueStore & ConfigurationSource,
     ) {
+        this.messageBroker = new AMQPMessageBroker(configuration);
         net.createServer((socket : net.Socket) : void => {
             const connection : Connection = new Connection(this, socket);
         }).listen(

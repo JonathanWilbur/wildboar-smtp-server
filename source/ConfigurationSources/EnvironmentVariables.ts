@@ -1,7 +1,8 @@
-import TypedKeyValueStore from "../ConfigurationSource";
+import ConfigurationSource from "../ConfigurationSource";
+import TypedKeyValueStore from "../TypedKeyValueStore";
 
 export default
-class EnvironmentVariableConfigurationSource implements TypedKeyValueStore {
+class EnvironmentVariableConfigurationSource implements ConfigurationSource,TypedKeyValueStore {
 
     private transformKeyNameToEnvironmentVariableName (key : string) : string {
         return key.toUpperCase().replace(".", "_");
@@ -87,7 +88,8 @@ class EnvironmentVariableConfigurationSource implements TypedKeyValueStore {
     }
 
     get smtp_server_ip_bind_address () : string {
-        const DEFAULT_VALUE : string = "0.0.0.0";
+        // const DEFAULT_VALUE : string = "0.0.0.0";
+        const DEFAULT_VALUE : string = "127.0.0.1";
         const env : string | undefined = this.getString("smtp.server.ip.bind_address");
         if (!env) return DEFAULT_VALUE;
         return env;
@@ -129,5 +131,35 @@ class EnvironmentVariableConfigurationSource implements TypedKeyValueStore {
         if (!env) return DEFAULT_VALUE;
         return env;
     }
+
+
+    get queue_server_hostname () : string {
+        const DEFAULT_VALUE : string = "localhost";
+        const env : string | undefined = this.getString("queue.server.hostname");
+        if (!env) return DEFAULT_VALUE;
+        return env;
+    }
+
+    get queue_server_tcp_listening_port () : number {
+        const DEFAULT_VALUE : number = 5672;
+        const env : number | undefined = this.getInteger("queue.server.tcp.listening_port");
+        if (!env) return DEFAULT_VALUE;
+        return env;
+    }
+
+    get queue_username () : string {
+        const DEFAULT_VALUE : string = "";
+        const env : string | undefined = this.getString("queue.hostname");
+        if (!env) return DEFAULT_VALUE;
+        return env;
+    }
+
+    get queue_password () : string {
+        const DEFAULT_VALUE : string = "";
+        const env : string | undefined = this.getString("queue.hostname");
+        if (!env) return DEFAULT_VALUE;
+        return env;
+    }
+
     
 }
