@@ -1,0 +1,30 @@
+{
+    "server": {
+        "id": "urn:uuid:6795237b-2c47-46b1-87f1-9bda67d42b3f",
+        "creationTime": "2019-01-26T11:07:37.829Z"
+    },
+    "connection": {
+        "id": "urn:uuid:3c567dfe-5c92-44bd-b37c-973e89bf2e9d",
+        "creationTime": "2019-01-26T11:08:03.562Z"
+    },
+    "messageBroker": {
+        "id": "urn:uuid:5898633f-e74b-43d8-902d-66e80501c3dc"
+    },
+    "configuration": {
+        "id": "urn:uuid:b7402bbf-c9ed-4e0e-a172-f0bb636cef82"
+    },
+    "transaction": {
+        "id": "urn:uuid:c992a0ff-2f00-4558-bed7-ce3a31ee2069",
+        "creationTime": "2019-01-26T11:08:03.573Z"
+    },
+    "email": {
+        "from": "from@sender.com",
+        "to": [
+            "to@recipient.com"
+        ],
+        "subject": "",
+        "body": "TESTERONI",
+        "id": "urn:uuid:df4de795-a0d4-4886-b2a8-beafea9b78ab",
+        "creationTime": "2019-01-26T11:08:03.577Z"
+    }
+}

@@ -1,6 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const uuidv4 = require("uuid/v4");
 class EnvironmentVariableConfigurationSource {
+    constructor() {
+        this.id = `urn:uuid:${uuidv4()}`;
+        this.creationTime = new Date();
+    }
     transformKeyNameToEnvironmentVariableName(key) {
         return key.toUpperCase().replace(".", "_");
     }

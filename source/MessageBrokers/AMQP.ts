@@ -1,10 +1,14 @@
 import ConfigurationSource from "../ConfigurationSource";
-import Email from "../Email";
+import EmailMessage from "../EmailMessage";
 import MessageBroker from "../MessageBroker";
 const amqp = require("amqplib/callback_api");
+const uuidv4 : () => string = require("uuid/v4");
 
 export default
 class AMQPMessageBroker implements MessageBroker {
+
+    public readonly id : string = `urn:uuid:${uuidv4()}`;
+    public readonly creationTime : Date = new Date();
 
     private readonly server_host! : string;
     private readonly server_port! : number;
@@ -21,19 +25,79 @@ class AMQPMessageBroker implements MessageBroker {
             this.connection = connection;
             connection.createChannel((err : Error, channel : any) => {
                 if (err) { console.log(err); return; }
-                channel.assertExchange("email.messages", "direct", { durable: true});
-                channel.assertQueue("after.smtp", { durable: true });
-                channel.assertQueue("event", { durable: false });
-                channel.assertQueue("authn", { durable: false });
-                channel.assertQueue("authz", { durable: false });
-                channel.bindQueue("after.smtp", "email.messages", "smtp");
+
+                channel.assertExchange("accepted.inbound.email", "direct", { durable: true });
+                channel.assertQueue("accepted.inbound.email.after.smtp", { durable: true });
+                channel.bindQueue("accepted.inbound.email.after.smtp", "accepted.inbound.email", "after.smtp");
+
+                channel.assertExchange("accepted.outbound.email", "direct", { durable: true });
+                channel.assertQueue("accepted.outbound.email.after.smtp", { durable: true });
+                channel.bindQueue("accepted.outbound.email.after.smtp", "accepted.outbound.email", "after.smtp");
+
+                channel.assertExchange("rejected.inbound.email", "direct", { durable: true });
+                channel.assertQueue("rejected.inbound.email.after.smtp", { durable: true });
+                channel.bindQueue("rejected.inbound.email.after.smtp", "rejected.inbound.email", "after.smtp");
+
+                channel.assertExchange("rejected.outbound.email", "direct", { durable: true });
+                channel.assertQueue("rejected.outbound.email.after.smtp", { durable: true });
+                channel.bindQueue("rejected.outbound.email.after.smtp", "rejected.outbound.email", "after.smtp");
+
+                channel.assertExchange("events", "topic", { durable: true });
+                channel.assertQueue("events.smtp", { durable: false });
+                channel.bindQueue("events.smtp", "events", "smtp");
+
+                // These will use RPC
+                channel.assertQueue("authentication", { durable: false });
+                channel.assertQueue("authorization", { durable: false });
+                channel.assertQueue("smtp.verify", { durable: false });
+                channel.assertQueue("smtp.expand", { durable: false });
+                
                 this.channel = channel;
             });
         });
     }
 
-    public publishEmail (email : Email) : void {
-        this.channel.publish("email.messages", "after.smtp", JSON.stringify(email));
+    public acceptInboundEmail (message : EmailMessage) : void {
+        this.channel.publish("accepted.inbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
     }
+
+    public acceptOutboundEmail (message : EmailMessage) : void {
+        this.channel.publish("accepted.outbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+    }
+
+    public rejectInboundEmail (message : EmailMessage) : void {
+        this.channel.publish("rejected.inbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+    }
+
+    public rejectOutboundEmail (message : EmailMessage) : void {
+        this.channel.publish("rejected.outbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+    }
+
+    public publishEvent (topic : string, message : object) : void {
+        this.channel.publish("events", topic, new Buffer(JSON.stringify(message)));
+    }
+    
+    // These use RPC
+
+    // TODO: Return authenticated attributes and assign them to the connection.
+    public checkAuthentication (message : object) : boolean {
+        return true;
+    }
+
+    // TODO: Send EmailMessage and return { authorized, code, reason, etc. }
+    public checkAuthorization (message : object) : boolean {
+        return true;
+    }
+
+    // TODO:
+    public verify (user : string) : object[] {
+        return [];
+    }
+
+    // TODO:
+    public expand (list : string) : object[] {
+        return [];
+    }
+
 
 }

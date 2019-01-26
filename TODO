@@ -1,5 +1,6 @@
-- [ ] Implement the configuration server
+- [x] Implement the configuration server
 - [ ] Implement transparency, per RFC 5321, Section 4.5.2.
+- [ ] Document what objects are required to have `creationTime`
 - [ ] RabbitMQ Queues needed
   - [ ] Authentication
   - [ ] Verification (VRFY Command)
@@ -18,6 +19,9 @@
   - [ ] X-LOCKDOWN = Only allow send and receive from the local domain
   - [ ] X-STACKTRACE
   - [ ] X-VARIABLES
+  - [ ] X-SPELLCHECK = Reject the message if anything fails spelling checks.
+  - [ ] X-DRYRUN = Do not actually do anything. Just respond like it did.
+  - [ ] X-DELAY = Applies a specified delay to the delivery of a message.
 - [ ] RFCs
   - [ ] RFC 1123 – Requirements for Internet Hosts—Application and Support (STD 3)
   - [ ] RFC 1870 – SMTP Service Extension for Message Size Declaration (оbsoletes: RFC 1653)

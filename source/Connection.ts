@@ -1,13 +1,23 @@
+import { ParsedMailbox as EmailAddress, parseOneAddress } from "email-addresses";
 import * as net from "net";
 import Lexeme from "./Lexeme";
 import LexemeType from "./LexemeType";
 import Scanner from "./Scanner";
 import Transaction from "./Transaction";
 import Server from "./Server";
+import Recipient from "./Recipient";
+import Email from "./Email";
+import EmailMessage from "./EmailMessage";
+import Temporal from "./Temporal";
+import UniquelyIdentified from "./UniquelyIdentified";
+const uuidv4 : () => string = require("uuid/v4");
 
 export default
-class Connection {
+class Connection implements Temporal, UniquelyIdentified {
 
+    public readonly id : string = `urn:uuid:${uuidv4()}`;
+    public readonly creationTime : Date = new Date();
+    
     private scanner = new Scanner(this.socket);
     // RFC 5321 Section 4.1.4:
     // A session that will contain mail transactions MUST first be
@@ -15,18 +25,15 @@ class Connection {
     // accept commands for non-mail transactions (e.g., VRFY or EXPN)
     // without this initialization.
     private clientSaidHello : boolean = false;
-    private clientEstimatedMessageSize : number = 0;
+    private clientEstimatedMessageSize : number = 0; // Will be used by the SIZE parameter
     private expectedLexemeType : LexemeType = LexemeType.COMMANDLINE;
-    private transaction : Transaction = {
-        from: "",
-        to: [],
-        data: Buffer.alloc(0)
-    };
+    private transaction! : Transaction;
 
     constructor (
         readonly server : Server,
         readonly socket : net.Socket
     ) {
+        this.resetTransaction();
 
         // TODO: Return 554 if connection rejected.
         this.respond(220, this.server.configuration.smtp_server_greeting);
@@ -48,8 +55,12 @@ class Connection {
                 } else if (lexeme.type === LexemeType.DATA) {
                     this.expectedLexemeType = LexemeType.COMMANDLINE;
                     this.transaction.data = lexeme.token;
+
+                    // RFC 5321, Section 4.1.1.4:
+                    // Receipt of the end of mail data indication requires the server to
+                    // process the stored mail transaction information.
+                    this.processTransaction();
                     this.respond(250, "DATA OK");
-                    console.log(this.transaction);
                 }
             };
         });
@@ -70,6 +81,8 @@ class Connection {
 
     private resetTransaction () : void {
         this.transaction = {
+            id: `urn:uuid:${uuidv4()}`,
+            creationTime: new Date(),
             from: "",
             to: [],
             data: Buffer.alloc(0)
@@ -273,5 +286,44 @@ class Connection {
     private executeQUIT (args : string) : void {
         this.respond(250, "Bye.");
         this.socket.end();
+    }
+
+    // TODO: The creationTime fields MUST be encoded as ISO 8601 strings
+    private processTransaction () : void {
+        this.transaction.to.forEach((recipient : Recipient) : void => {
+            const message : EmailMessage = {
+                server : {
+                    id: this.server.id,
+                    creationTime: this.server.creationTime
+                },
+                connection: {
+                    id: this.id,
+                    creationTime: this.creationTime
+                },
+                messageBroker: {
+                    id: this.server.messageBroker.id
+                },
+                configuration: {
+                    id: this.server.configuration.id
+                },
+                transaction: {
+                    id: this.transaction.id,
+                    creationTime: this.transaction.creationTime
+                },
+                email : new Email(
+                    this.transaction.from,
+                    this.transaction.to.map((recipient : Recipient) => recipient.destinationMailbox),
+                    "",
+                    this.transaction.data.toString()
+                )
+            };
+
+            if (recipient.destinationMailbox.endsWith(`@${this.server.configuration.smtp_server_domain}`)) {
+                this.server.messageBroker.acceptInboundEmail(message);
+            } else {
+                this.server.messageBroker.acceptOutboundEmail(message);
+            }
+        });
+        this.resetTransaction();
     }
 }

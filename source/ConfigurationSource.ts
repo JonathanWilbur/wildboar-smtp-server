@@ -1,5 +1,8 @@
+import Temporal from "./Temporal";
+import UniquelyIdentified from "./UniquelyIdentified";
+
 export default
-interface ConfigurationSource {
+interface ConfigurationSource extends Temporal, UniquelyIdentified {
     smtp_server_ip_bind_address : string;
     smtp_server_tcp_listening_port : number;
     smtp_server_domain : string;

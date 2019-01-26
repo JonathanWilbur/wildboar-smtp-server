@@ -1,19 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const Scanner_1 = require("./Scanner");
+const Email_1 = require("./Email");
+const uuidv4 = require("uuid/v4");
 class Connection {
     constructor(server, socket) {
         this.server = server;
         this.socket = socket;
+        this.id = `urn:uuid:${uuidv4()}`;
+        this.creationTime = new Date();
         this.scanner = new Scanner_1.default(this.socket);
         this.clientSaidHello = false;
         this.clientEstimatedMessageSize = 0;
         this.expectedLexemeType = 0;
-        this.transaction = {
-            from: "",
-            to: [],
-            data: Buffer.alloc(0)
-        };
+        this.resetTransaction();
         this.respond(220, this.server.configuration.smtp_server_greeting);
         socket.on("data", (data) => {
             this.scanner.enqueueData(data);
@@ -40,8 +40,8 @@ class Connection {
                 else if (lexeme.type === 1) {
                     this.expectedLexemeType = 0;
                     this.transaction.data = lexeme.token;
+                    this.processTransaction();
                     this.respond(250, "DATA OK");
-                    console.log(this.transaction);
                 }
             }
             ;
@@ -60,6 +60,8 @@ class Connection {
     }
     resetTransaction() {
         this.transaction = {
+            id: `urn:uuid:${uuidv4()}`,
+            creationTime: new Date(),
             from: "",
             to: [],
             data: Buffer.alloc(0)
@@ -205,6 +207,38 @@ class Connection {
     executeQUIT(args) {
         this.respond(250, "Bye.");
         this.socket.end();
+    }
+    processTransaction() {
+        this.transaction.to.forEach((recipient) => {
+            const message = {
+                server: {
+                    id: this.server.id,
+                    creationTime: this.server.creationTime
+                },
+                connection: {
+                    id: this.id,
+                    creationTime: this.creationTime
+                },
+                messageBroker: {
+                    id: this.server.messageBroker.id
+                },
+                configuration: {
+                    id: this.server.configuration.id
+                },
+                transaction: {
+                    id: this.transaction.id,
+                    creationTime: this.transaction.creationTime
+                },
+                email: new Email_1.default(this.transaction.from, this.transaction.to.map((recipient) => recipient.destinationMailbox), "", this.transaction.data.toString())
+            };
+            if (recipient.destinationMailbox.endsWith(`@${this.server.configuration.smtp_server_domain}`)) {
+                this.server.messageBroker.acceptInboundEmail(message);
+            }
+            else {
+                this.server.messageBroker.acceptOutboundEmail(message);
+            }
+        });
+        this.resetTransaction();
     }
 }
 exports.default = Connection;
