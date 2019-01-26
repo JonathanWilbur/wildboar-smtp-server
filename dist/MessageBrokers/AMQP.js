@@ -20,6 +20,7 @@ class AMQPMessageBroker {
                     console.log(err);
                     return;
                 }
+                this.channel = channel;
                 channel.assertExchange("accepted.inbound.email", "direct", { durable: true });
                 channel.assertQueue("accepted.inbound.email.after.smtp", { durable: true });
                 channel.bindQueue("accepted.inbound.email.after.smtp", "accepted.inbound.email", "after.smtp");
@@ -39,7 +40,6 @@ class AMQPMessageBroker {
                 channel.assertQueue("authorization", { durable: false });
                 channel.assertQueue("smtp.verify", { durable: false });
                 channel.assertQueue("smtp.expand", { durable: false });
-                this.channel = channel;
             });
         });
     }
@@ -69,6 +69,10 @@ class AMQPMessageBroker {
     }
     expand(list) {
         return [];
+    }
+    close() {
+        this.channel.close();
+        this.connection.close();
     }
 }
 exports.default = AMQPMessageBroker;

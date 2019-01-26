@@ -26,6 +26,12 @@ class Server implements UniquelyIdentified {
             this.configuration.smtp_server_ip_bind_address,
             () : void => { console.log("Listening for connections..."); }
         );
+
+        process.on('SIGINT', () : void => {
+            console.log("Interrupted. Shutting down.");
+            this.messageBroker.close();
+            process.exit();
+        });
     }
 
 }

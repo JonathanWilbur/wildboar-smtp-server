@@ -16,4 +16,5 @@ interface MessageBroker extends UniquelyIdentified {
     verify (user : string) : object[];
     expand (list : string) : object[];
 
+    close () : void;
 }

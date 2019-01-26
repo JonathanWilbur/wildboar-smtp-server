@@ -13,6 +13,11 @@ class Server {
         net.createServer((socket) => {
             const connection = new Connection_1.default(this, socket);
         }).listen(this.configuration.smtp_server_tcp_listening_port, this.configuration.smtp_server_ip_bind_address, () => { console.log("Listening for connections..."); });
+        process.on('SIGINT', () => {
+            console.log("Interrupted. Shutting down.");
+            this.messageBroker.close();
+            process.exit();
+        });
     }
 }
 exports.default = Server;

@@ -23,8 +23,10 @@ class AMQPMessageBroker implements MessageBroker {
         amqp.connect(`amqp://${this.server_host}:${this.server_port}`, (err : Error, connection : any) => {
             if (err) { console.log(err); return; }
             this.connection = connection;
+
             connection.createChannel((err : Error, channel : any) => {
                 if (err) { console.log(err); return; }
+                this.channel = channel;
 
                 channel.assertExchange("accepted.inbound.email", "direct", { durable: true });
                 channel.assertQueue("accepted.inbound.email.after.smtp", { durable: true });
@@ -51,8 +53,6 @@ class AMQPMessageBroker implements MessageBroker {
                 channel.assertQueue("authorization", { durable: false });
                 channel.assertQueue("smtp.verify", { durable: false });
                 channel.assertQueue("smtp.expand", { durable: false });
-                
-                this.channel = channel;
             });
         });
     }
@@ -99,5 +99,9 @@ class AMQPMessageBroker implements MessageBroker {
         return [];
     }
 
+    public close () : void {
+        this.channel.close();
+        this.connection.close();
+    }
 
 }
