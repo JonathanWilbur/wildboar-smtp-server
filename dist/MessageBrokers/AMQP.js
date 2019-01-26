@@ -44,19 +44,19 @@ class AMQPMessageBroker {
         });
     }
     acceptInboundEmail(message) {
-        this.channel.publish("accepted.inbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("accepted.inbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
     acceptOutboundEmail(message) {
-        this.channel.publish("accepted.outbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("accepted.outbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
     rejectInboundEmail(message) {
-        this.channel.publish("rejected.inbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("rejected.inbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
     rejectOutboundEmail(message) {
-        this.channel.publish("rejected.outbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("rejected.outbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
     publishEvent(topic, message) {
-        this.channel.publish("events", topic, new Buffer(JSON.stringify(message)));
+        this.channel.publish("events", topic, Buffer.from(JSON.stringify(message)));
     }
     checkAuthentication(message) {
         return true;

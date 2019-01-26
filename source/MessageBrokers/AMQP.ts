@@ -58,23 +58,23 @@ class AMQPMessageBroker implements MessageBroker {
     }
 
     public acceptInboundEmail (message : EmailMessage) : void {
-        this.channel.publish("accepted.inbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("accepted.inbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
 
     public acceptOutboundEmail (message : EmailMessage) : void {
-        this.channel.publish("accepted.outbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("accepted.outbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
 
     public rejectInboundEmail (message : EmailMessage) : void {
-        this.channel.publish("rejected.inbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("rejected.inbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
 
     public rejectOutboundEmail (message : EmailMessage) : void {
-        this.channel.publish("rejected.outbound.email", "after.smtp", new Buffer(JSON.stringify(message)));
+        this.channel.publish("rejected.outbound.email", "after.smtp", Buffer.from(JSON.stringify(message)));
     }
 
     public publishEvent (topic : string, message : object) : void {
-        this.channel.publish("events", topic, new Buffer(JSON.stringify(message)));
+        this.channel.publish("events", topic, Buffer.from(JSON.stringify(message)));
     }
     
     // These use RPC
