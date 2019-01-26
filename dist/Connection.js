@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Scanner_1 = require("./Scanner");
 const Email_1 = require("./Email");
 const uuidv4 = require("uuid/v4");
+const replaceBuffer = require("replace-buffer");
 class Connection {
     constructor(server, socket) {
         this.server = server;
@@ -39,7 +40,8 @@ class Connection {
                 }
                 else if (lexeme.type === 1) {
                     this.expectedLexemeType = 0;
-                    this.transaction.data = lexeme.token;
+                    const data = Buffer.from(lexeme.token);
+                    this.transaction.data = replaceBuffer(data, "\r\n.", "\r\n");
                     this.processTransaction();
                     this.respond(250, "DATA OK");
                 }

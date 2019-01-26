@@ -20,6 +20,6 @@ s.on("receive", (chunk) => {
     // await s.authPlain({username: 'john', password: 'secret'}); // authenticates a user
     await s.mail({from: 'from@sender.com'});
     await s.rcpt({to: 'to@recipient.com'});
-    await s.data('TESTERONI'); // runs DATA command and streams email source
+    await s.data('TESTERONI\r\n.something else \r\n...WUTT?'); // runs DATA command and streams email source
     await s.quit(); // runs QUIT command
 })().catch(console.error);

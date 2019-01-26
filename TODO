@@ -1,4 +1,5 @@
-- [ ] Implement transparency, per RFC 5321, Section 4.5.2.
+- [ ] Rewrite Authx to use promises
+- [x] Implement transparency, per RFC 5321, Section 4.5.2.
 - [ ] Custom commands
   - [ ] X-SHUTDOWN = Shuts down the server
   - [ ] X-DISRUPT = Disconnects everybody

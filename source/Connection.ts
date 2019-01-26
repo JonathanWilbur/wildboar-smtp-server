@@ -11,6 +11,7 @@ import EmailMessage from "./EmailMessage";
 import Temporal from "./Temporal";
 import UniquelyIdentified from "./UniquelyIdentified";
 const uuidv4 : () => string = require("uuid/v4");
+const replaceBuffer = require("replace-buffer");
 
 export default
 class Connection implements Temporal, UniquelyIdentified {
@@ -54,7 +55,10 @@ class Connection implements Temporal, UniquelyIdentified {
                     this.dispatchCommand(command, args);
                 } else if (lexeme.type === LexemeType.DATA) {
                     this.expectedLexemeType = LexemeType.COMMANDLINE;
-                    this.transaction.data = lexeme.token;
+                    const data : Buffer = Buffer.from(lexeme.token); // So lexeme.token is not modified by reference.
+
+                    // See RFC 5321, Section 4.5.2.
+                    this.transaction.data = replaceBuffer(data, "\r\n.", "\r\n");
 
                     // RFC 5321, Section 4.1.1.4:
                     // Receipt of the end of mail data indication requires the server to

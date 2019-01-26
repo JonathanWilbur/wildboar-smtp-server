@@ -15,6 +15,7 @@
   "dependencies": {
     "amqplib": "^0.5.3",
     "email-addresses": "^3.0.3",
+    "replace-buffer": "^1.2.1",
     "uuid": "^3.3.2"
   }
 }
