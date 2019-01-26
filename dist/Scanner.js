@@ -8,7 +8,8 @@ class Scanner {
         this.scanCursor = 0;
     }
     enqueueData(data) {
-        this.receivedData = Buffer.concat([this.receivedData, data]);
+        this.receivedData = Buffer.concat([this.receivedData.slice(this.scanCursor), data]);
+        this.scanCursor = 0;
     }
     scanLine() {
         const indexOfCRLF = this.receivedData.indexOf(Scanner.LINE_TERMINATOR, this.scanCursor);

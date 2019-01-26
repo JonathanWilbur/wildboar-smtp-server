@@ -14,9 +14,9 @@ class Scanner {
 
     constructor (readonly socket : net.Socket) {}
 
-    // TODO: Make this clear the buffer periodically.
     public enqueueData (data : Buffer) : void {
-        this.receivedData = Buffer.concat([ this.receivedData, data ]);
+        this.receivedData = Buffer.concat([ this.receivedData.slice(this.scanCursor), data ]);
+        this.scanCursor = 0;
     }
 
     public scanLine () : Lexeme | null {
