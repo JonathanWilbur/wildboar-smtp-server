@@ -302,7 +302,19 @@ class Connection implements Temporal, UniquelyIdentified {
                 },
                 connection: {
                     id: this.id,
-                    creationTime: this.creationTime
+                    creationTime: this.creationTime,
+                    remote: {
+                        family: this.socket.remoteFamily,
+                        address: this.socket.remoteAddress,
+                        port: this.socket.remotePort
+                    },
+                    local: {
+                        address: this.socket.localAddress,
+                        port: this.socket.localPort
+                    },
+                    bufferSize: this.socket.bufferSize,
+                    bytesRead: this.socket.bytesRead,
+                    bytesWritten: this.socket.bytesWritten
                 },
                 messageBroker: {
                     id: this.server.messageBroker.id
