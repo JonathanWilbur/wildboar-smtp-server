@@ -11,7 +11,7 @@ interface MessageBroker extends UniquelyIdentified {
     publishEvent (topic : string, message : object) : void;
     
     // These use RPC
-    checkAuthentication (message : object) : boolean;
+    checkAuthentication (saslMechanism : string, message : object) : Promise<boolean>;
     checkAuthorization (message : object) : boolean;
     verify (user : string) : object[];
     expand (list : string) : object[];

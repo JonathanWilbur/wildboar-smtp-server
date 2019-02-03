@@ -15,6 +15,14 @@ class Server implements UniquelyIdentified {
     public readonly creationTime : Date = new Date();
     public messageBroker! : MessageBroker;
 
+    public readonly supportedSASLAuthenticationMechanisms : string[] = [
+        "PLAIN"
+    ];
+
+    public readonly extensions : string[] = [
+        `AUTH ${this.supportedSASLAuthenticationMechanisms.join(" ")}`
+    ];
+
     constructor(
         readonly configuration : TypedKeyValueStore & ConfigurationSource,
     ) {

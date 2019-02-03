@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const Scanner_1 = require("./Scanner");
 const Email_1 = require("./Email");
+const Plain_1 = require("./SASLAuthenticationMechanisms/Plain");
 const uuidv4 = require("uuid/v4");
 const replaceBuffer = require("replace-buffer");
 class Connection {
@@ -14,6 +15,7 @@ class Connection {
         this.clientSaidHello = false;
         this.clientEstimatedMessageSize = 0;
         this.expectedLexemeType = 0;
+        this.saslAuthenticationMechanism = "";
         this.resetTransaction();
         this.respond(220, this.server.configuration.smtp_server_greeting);
         socket.on("data", (data) => {
@@ -29,6 +31,9 @@ class Connection {
                         break;
                     case (2):
                         lexeme = this.scanner.scanChunk();
+                        break;
+                    case (3):
+                        lexeme = this.scanner.scanLine();
                         break;
                 }
                 if (!lexeme)
@@ -58,7 +63,9 @@ class Connection {
     respondMultiline(code, lines) {
         if (lines.length === 0)
             return;
-        this.socket.write(`${lines.map((line) => `${code}-${line}`).join("\r\n")}`);
+        const codedLines = lines.map((line) => `${code}-${line}`);
+        codedLines[codedLines.length - 1] = `${code} ${lines[lines.length - 1]}`;
+        this.socket.write(codedLines.join("\r\n") + "\r\n");
     }
     resetTransaction() {
         this.transaction = {
@@ -105,6 +112,9 @@ class Connection {
             case ("QUIT"):
                 this.executeQUIT(args);
                 break;
+            case ("AUTH"):
+                this.executeAUTH(args);
+                break;
             default: {
                 this.respond(504, `Command '${command}' not implemented.`);
             }
@@ -118,7 +128,7 @@ class Connection {
     executeEHLO(args) {
         this.clientSaidHello = true;
         this.resetTransaction();
-        this.respond(250, this.server.configuration.smtp_server_domain);
+        this.respondMultiline(250, ["testeroni"].concat(this.server.extensions));
     }
     executeMAIL(args) {
         if (!this.clientSaidHello) {
@@ -209,6 +219,44 @@ class Connection {
     executeQUIT(args) {
         this.respond(250, "Bye.");
         this.socket.end();
+    }
+    executeAUTH(args) {
+        const tokens = args.split(" ");
+        if (tokens.length < 1)
+            return;
+        if (tokens.length > 2)
+            return;
+        this.saslAuthenticationMechanism = tokens[0];
+        switch (this.saslAuthenticationMechanism) {
+            case (Plain_1.default.mechanismName): {
+                this.saslAuthenticator = new Plain_1.default(this.server.messageBroker);
+                break;
+            }
+            default: {
+                console.log(`Could not find an authenticator for SASL mechanism ${this.saslAuthenticationMechanism}.`);
+                return;
+            }
+        }
+        if (tokens.length === 1) {
+            this.respond(334, "");
+            this.expectedLexemeType = 3;
+        }
+        else {
+            this.saslAuthenticator.processBase64Response(tokens[1]);
+        }
+        let nextChallenge;
+        while (nextChallenge = this.saslAuthenticator.nextBase64Challenge()) {
+            this.respond(334, nextChallenge);
+            this.expectedLexemeType = 3;
+        }
+        this.saslAuthenticator.getAuthenticatedLocalPart()
+            .then((localPart) => {
+            this.respond(235, `Successfully authenticated user ${localPart}.`);
+        })
+            .catch((failureMessage) => {
+            this.respond(535, `Unable to authenticate: ${failureMessage}`);
+            this.expectedLexemeType = 0;
+        });
     }
     processTransaction() {
         this.transaction.to.forEach((recipient) => {

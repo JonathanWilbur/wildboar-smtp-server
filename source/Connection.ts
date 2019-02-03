@@ -10,6 +10,8 @@ import Email from "./Email";
 import EmailMessage from "./EmailMessage";
 import Temporal from "./Temporal";
 import UniquelyIdentified from "./UniquelyIdentified";
+import SASLAuthenticationMechanism from "./SASLAuthenticationMechanism";
+import PlainSASLAuthentication from "./SASLAuthenticationMechanisms/Plain";
 const uuidv4 : () => string = require("uuid/v4");
 const replaceBuffer = require("replace-buffer");
 
@@ -29,6 +31,8 @@ class Connection implements Temporal, UniquelyIdentified {
     private clientEstimatedMessageSize : number = 0; // Will be used by the SIZE parameter
     private expectedLexemeType : LexemeType = LexemeType.COMMANDLINE;
     private transaction! : Transaction;
+    private saslAuthenticationMechanism : string = "";
+    private saslAuthenticator : SASLAuthenticationMechanism | undefined;
 
     constructor (
         readonly server : Server,
@@ -46,6 +50,7 @@ class Connection implements Temporal, UniquelyIdentified {
                     case (LexemeType.COMMANDLINE):  lexeme = this.scanner.scanLine();  break;
                     case (LexemeType.DATA):         lexeme = this.scanner.scanData();  break;
                     case (LexemeType.CHUNK):        lexeme = this.scanner.scanChunk(); break;
+                    case (LexemeType.DATALINE):     lexeme = this.scanner.scanLine(); break; // REVIEW
                     // TODO: Default
                 }
                 if (!lexeme) break;
@@ -78,9 +83,13 @@ class Connection implements Temporal, UniquelyIdentified {
         this.socket.write(`${code} ${message}\r\n`);
     }
 
+    // When the server provides a multiline response, the last line must not
+    // have a dash, but rather, a space, after the status code.
     private respondMultiline (code : number, lines : string[]) : void {
         if (lines.length === 0) return;
-        this.socket.write(`${lines.map((line : string)=> `${code}-${line}`).join("\r\n")}`);
+        const codedLines : string[] = lines.map((line : string)=> `${code}-${line}`);
+        codedLines[codedLines.length - 1] = `${code} ${lines[lines.length - 1]}`;
+        this.socket.write(codedLines.join("\r\n") + "\r\n");
     }
 
     private resetTransaction () : void {
@@ -109,6 +118,7 @@ class Connection implements Temporal, UniquelyIdentified {
             case ("HELP"): this.executeHELP(args); break;
             case ("NOOP"): this.executeNOOP(args); break;
             case ("QUIT"): this.executeQUIT(args); break;
+            case ("AUTH"): this.executeAUTH(args); break;
             default: {
                 this.respond(504, `Command '${command}' not implemented.`);
             }
@@ -152,7 +162,9 @@ class Connection implements Temporal, UniquelyIdentified {
         // and reset the state exactly as if a RSET command had been issued.
         this.resetTransaction();
 
-        this.respond(250, this.server.configuration.smtp_server_domain);
+        // this.respond(250, this.server.configuration.smtp_server_domain);
+        // this.server.configuration.smtp_server_domain
+        this.respondMultiline(250, [ "testeroni" ].concat(this.server.extensions));
     }
 
     // TODO: Return 552, 451, 452, 550, 553, 503, 455, 555
@@ -292,7 +304,47 @@ class Connection implements Temporal, UniquelyIdentified {
         this.socket.end();
     }
 
-    // TODO: The creationTime fields MUST be encoded as ISO 8601 strings
+    private executeAUTH (args : string) : void {
+        const tokens : string[] = args.split(" ");
+        if (tokens.length < 1) return;
+        if (tokens.length > 2) return;
+        this.saslAuthenticationMechanism = tokens[0];
+
+        switch (this.saslAuthenticationMechanism) {
+            case (PlainSASLAuthentication.mechanismName): {
+                this.saslAuthenticator = new PlainSASLAuthentication(this.server.messageBroker);
+                break;
+            }
+            default: {
+                console.log(`Could not find an authenticator for SASL mechanism ${this.saslAuthenticationMechanism}.`);
+                return;
+            }
+        }
+
+        if (tokens.length === 1) {
+            // Expect the initial response on the next line.
+            this.respond(334, "");
+            this.expectedLexemeType = LexemeType.DATALINE;
+        } else { // The initial response was included.
+            this.saslAuthenticator.processBase64Response(tokens[1]);
+        }
+
+        let nextChallenge : string | null;
+        while (nextChallenge = this.saslAuthenticator.nextBase64Challenge()) {
+            this.respond(334, nextChallenge);
+            this.expectedLexemeType = LexemeType.DATALINE;
+        }
+
+        this.saslAuthenticator.getAuthenticatedLocalPart()
+        .then((localPart : string) => {
+            this.respond(235, `Successfully authenticated user ${localPart}.`);
+        })
+        .catch((failureMessage : string) => {
+            this.respond(535, `Unable to authenticate: ${failureMessage}`);
+            this.expectedLexemeType = LexemeType.COMMANDLINE;
+        });
+    }
+
     private processTransaction () : void {
         this.transaction.to.forEach((recipient : Recipient) : void => {
             const message : EmailMessage = {

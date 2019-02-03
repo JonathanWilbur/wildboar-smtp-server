@@ -1,4 +1,17 @@
 - [ ] Rewrite Authx to use promises
+- [ ] Apply Timeouts to promises
+- [ ] SASLPrep
+- [ ] Go back and add maximum line length changes
+  - [ ] MLL changes when using AUTH in the MAIL FROM command. +500 characters
+  - [ ] MLL changes when using SIZE. +26 characters
+- [ ] "The AUTH command is not permitted during a mail transaction.
+       An AUTH command issued during a mail transaction MUST be
+       rejected with a 503 reply."
+- [ ] "A client response consists of a line containing a [BASE64]
+       encoded string.  If the client wishes to cancel the
+       authentication exchange, it issues a line with a single "*".
+       If the server receives such a response, it MUST reject the
+       AUTH command by sending a 501 reply."
 - [x] Implement transparency, per RFC 5321, Section 4.5.2.
 - [ ] Custom commands
   - [ ] X-SHUTDOWN = Shuts down the server
@@ -14,6 +27,17 @@
   - [ ] X-SPELLCHECK = Reject the message if anything fails spelling checks.
   - [ ] X-DRYRUN = Do not actually do anything. Just respond like it did.
   - [ ] X-DELAY = Applies a specified delay to the delivery of a message.
+- [ ] SASL Authentication Mechanisms (https://www.iana.org/assignments/sasl-mechanisms/sasl-mechanisms.xhtml)
+  - [ ] PLAIN (RFC 4616)
+  - [ ] DIGEST-MD5 (RFC 2831) (Better than CRAM-MD5)
+  - [x] ~~CRAM-MD5 (RFC 2195)~~
+  - [ ] OTP (RFC 2444)
+  - [ ] ANONYMOUS (RFC 2245)
+  - [ ] GSSAPI (RFC 4752)
+  - [ ] NTLM (http://davenport.sourceforge.net/ntlm.html#ntlmSmtpAuthentication) (This might be proprietary)
+  - [ ] XOAUTH2 (https://developers.google.com/gmail/imap/xoauth2-protocol)
+  - [ ] OAUTHBEARER (RFC 7628)
+  - [ ] OAUTH10A (RFC 7628)
 - [ ] RFCs
   - [ ] RFC 1123 – Requirements for Internet Hosts—Application and Support (STD 3)
   - [ ] RFC 1870 – SMTP Service Extension for Message Size Declaration (оbsoletes: RFC 1653)
@@ -26,14 +50,18 @@
   - [ ] RFC 3464 – An Extensible Message Format for Delivery Status Notifications (obsoletes RFC 1894)
   - [ ] RFC 3798 – Message Disposition Notification (updates RFC 3461)
   - [ ] RFC 3834 – Recommendations for Automatic Responses to Electronic Mail
+  - [ ] RFC 4616 - The PLAIN Simple Authentication and Security Layer (SASL) Mechanism
   - [ ] RFC 4952 – Overview and Framework for Internationalized Email (updated by RFC 5336)
   - [ ] RFC 4954 – SMTP Service Extension for Authentication (obsoletes RFC 2554, updates RFC 3463, updated by RFC 5248)
+    - [ ] Create a new LexemeType: DATALINE
+    - [ ] MLL changes when using AUTH in the MAIL FROM command. +500 characters
   - [ ] RFC 5068 – Email Submission Operations: Access and Accountability Requirements (BCP 134)
   - [ ] RFC 5248 – A Registry for SMTP Enhanced Mail System Status Codes (BCP 138) (updates RFC 3463)
-  - [ ] RFC 5321 – The Simple Mail Transfer Protocol (obsoletes RFC 821 aka STD 10, RFC 974, RFC 1869, RFC 2821, updates RFC 1123)
+  - [x] RFC 5321 – The Simple Mail Transfer Protocol (obsoletes RFC 821 aka STD 10, RFC 974, RFC 1869, RFC 2821, updates RFC 1123)
   - [ ] RFC 5322 – Internet Message Format (obsoletes RFC 822 aka STD 11, and RFC 2822)
   - [ ] RFC 5504 – Downgrading Mechanism for Email Address Internationalization
   - [ ] RFC 6409 – Message Submission for Mail (STD 72) (obsoletes RFC 4409, RFC 2476)
   - [ ] RFC 6522 – The Multipart/Report Content Type for the Reporting of Mail System Administrative Messages (obsoletes RFC 3462, and in turn RFC 1892)
   - [ ] RFC 6531 – SMTP Extension for Internationalized Email Addresses (updates RFC 2821, RFC 2822, RFC 4952, and RFC 5336)
+  - [ ] RFC 7628 - A Set of Simple Authentication and Security Layer (SASL) Mechanisms for OAuth
   - [ ] RFC 8314 - Cleartext Considered Obsolete: Use of Transport Layer Security (TLS) for Email Submission and Access

@@ -5,6 +5,7 @@ var LexemeType;
     LexemeType[LexemeType["COMMANDLINE"] = 0] = "COMMANDLINE";
     LexemeType[LexemeType["DATA"] = 1] = "DATA";
     LexemeType[LexemeType["CHUNK"] = 2] = "CHUNK";
+    LexemeType[LexemeType["DATALINE"] = 3] = "DATALINE";
 })(LexemeType || (LexemeType = {}));
 exports.default = LexemeType;
 //# sourceMappingURL=LexemeType.js.map

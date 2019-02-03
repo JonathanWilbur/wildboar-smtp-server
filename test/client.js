@@ -17,7 +17,7 @@ s.on("receive", (chunk) => {
     await s.noop();
     // await s.help(); // Not implemented in this client.
     await s.greet({hostname: 'spaghetti'});
-    // await s.authPlain({username: 'john', password: 'secret'}); // authenticates a user
+    await s.authPlain({username: 'john', password: 'secret'}); // authenticates a user
     await s.mail({from: 'from@sender.com'});
     await s.rcpt({to: 'to@recipient.com'});
     await s.data('TESTERONI\r\n.something else \r\n...WUTT?'); // runs DATA command and streams email source

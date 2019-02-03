@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const events_1 = require("events");
 const amqp = require("amqplib/callback_api");
 const uuidv4 = require("uuid/v4");
 class AMQPMessageBroker {
@@ -7,6 +8,7 @@ class AMQPMessageBroker {
         this.configuration = configuration;
         this.id = `urn:uuid:${uuidv4()}`;
         this.creationTime = new Date();
+        this.responseEmitter = new events_1.EventEmitter();
         this.server_host = configuration.queue_server_hostname;
         this.server_port = configuration.queue_server_tcp_listening_port;
         amqp.connect(`amqp://${this.server_host}:${this.server_port}`, (err, connection) => {
@@ -36,10 +38,23 @@ class AMQPMessageBroker {
                 channel.assertExchange("events", "topic", { durable: true });
                 channel.assertQueue("events.smtp", { durable: false });
                 channel.bindQueue("events.smtp", "events", "smtp");
-                channel.assertQueue("authentication", { durable: false });
+                channel.assertExchange("authentication", "direct", { durable: true });
+                channel.assertQueue("authentication.responses", { durable: false });
+                channel.bindQueue("authentication.responses", "authentication", "authentication.responses");
+                channel.assertQueue("PLAIN", { durable: false });
+                channel.bindQueue("PLAIN", "authentication", "authentication.PLAIN");
+                channel.assertQueue("EXTERNAL", { durable: false });
+                channel.bindQueue("EXTERNAL", "authentication", "authentication.EXTERNAL");
+                channel.assertQueue("ANONYMOUS", { durable: false });
+                channel.bindQueue("ANONYMOUS", "authentication", "authentication.ANONYMOUS");
                 channel.assertQueue("authorization", { durable: false });
                 channel.assertQueue("smtp.verify", { durable: false });
                 channel.assertQueue("smtp.expand", { durable: false });
+                channel.consume("authentication.responses", (message) => {
+                    if (!message)
+                        return;
+                    this.responseEmitter.emit(message.properties.correlationId, message);
+                }, { noAck: true });
             });
         });
     }
@@ -58,8 +73,16 @@ class AMQPMessageBroker {
     publishEvent(topic, message) {
         this.channel.publish("events", topic, Buffer.from(JSON.stringify(message)));
     }
-    checkAuthentication(message) {
-        return true;
+    checkAuthentication(saslMechanism, message) {
+        this.channel.publish("authentication", ("authentication." + saslMechanism), Buffer.from(JSON.stringify(message)));
+        return new Promise((resolve, reject) => {
+            this.responseEmitter.on(message.id, (response) => {
+                if (response.toString())
+                    resolve(JSON.parse(response.toString()));
+                else
+                    reject(new Error("Could not convert messagee to string."));
+            });
+        });
     }
     checkAuthorization(message) {
         return true;

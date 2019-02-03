@@ -39,105 +39,11 @@ Having no application-layer means of communicating with the TLS server,
 STARTTLS will likely never be supported. But STARTTLS is innately insecure
 anyway.
 
-## Message Serialization
-
-All messages shall be serialized in JSON. Even though binary serialization
-formats like Google's Protocol Buffers, ASN.1 Basic Encoding Rules, or
-Parquet may be fine for sending messages, the overwhelming majority of data
-transferred will come from the message bodies of emails or log messages,
-rather than flags or other metadata. This means that using a binary protocol
-would afford the Wildboar Email Stack (WES) almost no data compression.
-
-Also, JSON is probably the most widely supported / understood serialization
-format, and in most programming languages, it is supported in the standard
-library. If I used another serialization format, I would have to pull in
-another dependency.
-
-Finally, JSON is readily accepted by most REST APIs, which makes integrating
-components of the Wildboar Email Stack far easier.
-
-Compression MUST NOT be used in the transport or store of messages or parts of
-messages (including contained email bodies or attachments), unless said
-contents were compressed upon receipt from an external source. To clarify, this
-rule does not apply to the storage of email messages, which may be stored in
-any way.
-
-### JSON Message Structure
-
-#### The Root Element
-
-The root element of each JSON document sent via the messaging queue shall be
-an object--not an array. If the data intended for transmission is an array,
-it shall still be encoded as a member of the root object; it shall not be
-the root object in the message itself.
-
-#### Anti-XSSI Prefix
-
-All JSON messages shall be prefixed with an [Anti-XSSI prefix](https://security.stackexchange.com/questions/110539/how-does-including-a-magic-prefix-to-a-json-response-work-to-prevent-xssi-attack),
-composed of these exact characters: `)]}'`. Prior to de-serializing said JSON
-message, this prefix should be stripped by the receiving application. There
-MUST be no whitespace added before those characters, but deserializing
-applications SHOULD be able to handle leading whitespace nevertheless.
-
-#### Serializing Identifiers
-
-- UUID-URNs should be serialized as described below.
-- IP addresses of all versions shall be serialized as strings.
-- MAC addresses and all other related IEEE identifiers shall be serialized
-  as strings.
-- Object identifiers (as specified in the ITU's X.660) shall be serialized as
-  an array of integers.
-- URIs, URLs, and URNs shall be serialized as strings.
-
-#### Serializing Time Types
-
-All dates and times MUST:
-
-- Be serialized as strings
-- Contain no leading or trailing whitespace
-- Comply with ISO 8601:2004 specifications
-
-All services that deserialize dates and times SHOULD:
-
-- Either:
-  - Be able to understand ISO 8601 negative or positive years, or
-  - Fail gracefully.
-
-#### Serializing Dates
-
-#### Serializing Times
-
-Times by themselves shall never be used. A timestamp must be used instead,
-which associates a specific date.
-
-#### Serializing Timestamps
-
-All timestamps MUST:
-
-- Be in UTC, which entails the inclusion of a `Z` at the end of the ISO 8601 timestamp.
-
-#### Unit Tests for JSON-encoding compliance
-
-REVIEW: Is this really applicable anymore?
-
-- The first characters of the message are `)]}'`, followed by optional
-  whitespace, followed by an opening curly bracket, `{`.
-- The last non-whitespace character of the message is `}`.
-- The second-to-last non-whitespace character of the message is not a comma, `,`.
-
 ## Message Transport
 
-All messages shall be transported through RabbitMQ, but I will try to keep the
-dependency on RabbitMQ loosely coupled. I would like the Wildboar Email Stack
-to at least support ZeroMQ as well. Initially, I am going with RabbitMQ,
-because it seems more popular and well-supported, as well as easier to use,
-not in the least because there is a web interface for interacting with it.
-
-AMQP will be the protocol of choice for communication. I briefly tried to make
-STOMP work, only because I was able to find a suitable TypeScript library for
-it, unlike AQMP. Unfortunately, I had so much trouble getting STOMP to work,
-I have to opt for AMQP. In hindsight, it makes more sense, anyway, because
-AMQP is a binary protocol, so it is lighter, whereas STOMP is text-based.
+Protocol: AMQP, but others may be supported later on.
+Serialization: JSON
+Compression: None
 
 ## Work Queues, Pub-Sub, and RPC
 
@@ -155,8 +61,17 @@ AMQP is a binary protocol, so it is lighter, whereas STOMP is text-based.
 - Log messages / events will be delivered through topic-based pub-sub.
 - Authentication will be handled through queue-mediated RPC.
   - The request will contain the authentication factors.
+  - The requests will be direct-routed from an exchange to mechanism-specific
+    queues, such as "PLAIN", "CRAM-MD5", etc.
+  - So that multiple workers can potentially attempt to authenticate a user,
+    ACKs will be used to signal that a worker successfully authenticated.
   - The response will contain a boolean affirming authentication, as well as
     optional attribute assertions (much like SAML).
+  - Configuration options determine whether to set up certain authentication
+    mechanism queues.
+  - The replyTo queue is pub/sub, because there could be multiple SMTP servers
+    which should read responses, and use the UUID-URN to determine which
+    connection just authenticated successfully.
 - I think Authorization will be a separate but similar queue from the
   Authentication queue, but I will decide when I implement it.
 - Email list/group lookup will use queue-mediated RPC, like authentication.
@@ -263,15 +178,6 @@ Even traffic that is internal to the stack SHOULD be encrypted, since it is
 possible that internal components may be replaced with external components,
 such as replacing the Minio store with AWS S3, or replacing the RabbitMQ
 message queue with AWS SQS.
-
-## Code
-
-If an object includes an `id` field, this field must be the first member of the
-object. If an object includes a `creationTime` field, this field must be the
-second field if an `id` field is included, or the first field if there is no
-`id` field. If the `creationTime` field can be initialized from outside of the
-constructor, it MUST be. If the `creationTime` field can only be initialized
-from within the constructor, it MUST be initialized first.
 
 ## Queue Configuration
 

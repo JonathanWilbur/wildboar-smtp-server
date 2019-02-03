@@ -1,19 +1,26 @@
 import ConfigurationSource from "../ConfigurationSource";
 import EmailMessage from "../EmailMessage";
+import { EventEmitter } from "events";
 import MessageBroker from "../MessageBroker";
+import UniquelyIdentified from "../UniquelyIdentified";
+import { Message, Channel, ConsumeMessage } from 'amqplib';
 const amqp = require("amqplib/callback_api");
 const uuidv4 : () => string = require("uuid/v4");
+
+// TODO: Add content_type
+// TODO: Add expiration, plus setTimeout to fire the events to remove the event handlers.
 
 export default
 class AMQPMessageBroker implements MessageBroker {
 
     public readonly id : string = `urn:uuid:${uuidv4()}`;
     public readonly creationTime : Date = new Date();
-
+    
     private readonly server_host! : string;
     private readonly server_port! : number;
     private connection! : any;
     private channel! : any;
+    private readonly responseEmitter: EventEmitter = new EventEmitter();
 
     constructor (
         readonly configuration : ConfigurationSource
@@ -24,7 +31,7 @@ class AMQPMessageBroker implements MessageBroker {
             if (err) { console.log(err); return; }
             this.connection = connection;
 
-            connection.createChannel((err : Error, channel : any) => {
+            connection.createChannel((err : Error, channel : Channel) => {
                 if (err) { console.log(err); return; }
                 this.channel = channel;
 
@@ -48,11 +55,26 @@ class AMQPMessageBroker implements MessageBroker {
                 channel.assertQueue("events.smtp", { durable: false });
                 channel.bindQueue("events.smtp", "events", "smtp");
 
-                // These will use RPC
-                channel.assertQueue("authentication", { durable: false });
+                channel.assertExchange("authentication", "direct", { durable: true });
+                channel.assertQueue("authentication.responses", { durable: false });
+                channel.bindQueue("authentication.responses", "authentication", "authentication.responses");
+
+                // Queues and bindings for the individual SASL mechanisms
+                channel.assertQueue("PLAIN", { durable: false });
+                channel.bindQueue("PLAIN", "authentication", "authentication.PLAIN");
+                channel.assertQueue("EXTERNAL", { durable: false });
+                channel.bindQueue("EXTERNAL", "authentication", "authentication.EXTERNAL");
+                channel.assertQueue("ANONYMOUS", { durable: false });
+                channel.bindQueue("ANONYMOUS", "authentication", "authentication.ANONYMOUS");
+
                 channel.assertQueue("authorization", { durable: false });
                 channel.assertQueue("smtp.verify", { durable: false });
                 channel.assertQueue("smtp.expand", { durable: false });
+
+                channel.consume("authentication.responses", (message : ConsumeMessage | null) => {
+                    if (!message) return;
+                    this.responseEmitter.emit(message.properties.correlationId, message);
+                }, { noAck: true });
             });
         });
     }
@@ -76,12 +98,38 @@ class AMQPMessageBroker implements MessageBroker {
     public publishEvent (topic : string, message : object) : void {
         this.channel.publish("events", topic, Buffer.from(JSON.stringify(message)));
     }
-    
-    // These use RPC
 
     // TODO: Return authenticated attributes and assign them to the connection.
-    public checkAuthentication (message : object) : boolean {
-        return true;
+    public checkAuthentication (saslMechanism : string, message : UniquelyIdentified) : Promise<boolean> {
+        this.channel.publish(
+            "authentication",
+            ("authentication." + saslMechanism),
+            Buffer.from(JSON.stringify(message)),
+            {
+                correlationId: message.id,
+                content_type: "application/json",
+                content_encoding: "8bit",
+                expiration: 10000, // TODO: Make this a configurable expiration.
+                replyTo: "authentication.responses"
+            });
+
+        // This induces a timeout, so that we do not accumulate event listeners
+        // if the authenticator misses some authentication requests.
+        setTimeout(() => {
+            this.responseEmitter.emit(message.id, null);
+        }, 10000); // TODO: Change this to a configurable timeout.
+
+        return new Promise<boolean>((resolve, reject) => {
+            // I got this idea from here: https://github.com/AlariCode/rabbitmq-rpc/blob/master/lib/index.ts
+            this.responseEmitter.once(message.id, (response : Message | null) => {
+                if (!response) {
+                    reject("Authentication attempt timed out.");
+                    return;
+                }
+                if (response.toString()) resolve(JSON.parse(response.toString()));
+                else reject(new Error("Could not convert message to string."));
+            });
+        });
     }
 
     // TODO: Send EmailMessage and return { authorized, code, reason, etc. }

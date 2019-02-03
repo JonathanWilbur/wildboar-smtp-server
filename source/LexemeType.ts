@@ -1,6 +1,7 @@
 const enum LexemeType {
     COMMANDLINE,
     DATA,
-    CHUNK
+    CHUNK,
+    DATALINE
 }
 export default LexemeType;
