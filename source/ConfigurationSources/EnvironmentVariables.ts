@@ -9,7 +9,7 @@ class EnvironmentVariableConfigurationSource implements ConfigurationSource,Type
     public readonly creationTime : Date = new Date();
 
     private transformKeyNameToEnvironmentVariableName (key : string) : string {
-        return key.toUpperCase().replace(".", "_");
+        return key.toUpperCase().replace(/\./g, "_");
     }
 
     public getBoolean(key : string) : boolean | undefined {
@@ -153,14 +153,14 @@ class EnvironmentVariableConfigurationSource implements ConfigurationSource,Type
 
     get queue_username () : string {
         const DEFAULT_VALUE : string = "";
-        const env : string | undefined = this.getString("queue.hostname");
+        const env : string | undefined = this.getString("queue.username");
         if (!env) return DEFAULT_VALUE;
         return env;
     }
 
     get queue_password () : string {
         const DEFAULT_VALUE : string = "";
-        const env : string | undefined = this.getString("queue.hostname");
+        const env : string | undefined = this.getString("queue.password");
         if (!env) return DEFAULT_VALUE;
         return env;
     }

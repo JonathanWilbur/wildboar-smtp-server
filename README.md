@@ -22,6 +22,11 @@ Non-Goals:
 - Low latency
 - Extreme throughput through code optimization
 
+## Standards
+
+This application attempts to conform to
+[Wildboar Microservices Architecture Standard](https://github.com/JonathanWilbur/wildboar-microservices).
+
 ## Configuration
 
 Wildboar SMTP Server currently obtains all configuration directives from
